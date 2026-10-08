@@ -40,7 +40,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: "pip"
 
       - name: Install Dependencies
         run: |
@@ -57,14 +56,11 @@ jobs:
           echo "===== Running jtvplus7.py ====="
           python script/jtvplus7.py
 
-          echo "===== Checking generated files ====="
-          ls -lah
-
           echo "===== Checking zio.m3u ====="
           if [ -f "zio.m3u" ]; then
             echo "zio.m3u FOUND"
-            wc -l zio.m3u
             ls -lh zio.m3u
+            wc -l zio.m3u
           else
             echo "ERROR: zio.m3u was NOT generated!"
             exit 1
@@ -97,7 +93,7 @@ jobs:
               git rebase --abort || true
             fi
 
-            echo "Push failed. Waiting before retry..."
+            echo "Push failed. Retrying..."
             sleep $((attempt * 3))
           done
 
