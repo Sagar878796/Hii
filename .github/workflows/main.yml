@@ -1,22 +1,30 @@
 name: Update zio playlist
+
 on:
   schedule:
     - cron: '*/10 * * * *'
+
   workflow_dispatch:
+
   push:
     branches:
       - main
     paths:
       - 'script/jtvplus7.py'
+
 jobs:
   update-playlist:
     runs-on: ubuntu-latest
+
     permissions:
       contents: write
+
     concurrency:
       group: update-jtv2
       cancel-in-progress: true
+
     steps:
+
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
@@ -25,18 +33,14 @@ jobs:
 
       - name: Configure Git
         run: |
-          git config --global user.name "sportlive18"
-          git config --global user.email "271363488+sportlive18@users.noreply.github.com"
-
-      - name: Fetch and Reset to Remote
-        run: |
-          git fetch origin main
-          git reset --hard origin/main
+          git config user.name "sportlive18"
+          git config user.email "271363488+sportlive18@users.noreply.github.com"
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.x"
+          python-version: "3.12"
+          cache: "pip"
 
       - name: Install Dependencies
         run: |
@@ -47,7 +51,24 @@ jobs:
         env:
           TZ: Asia/Kolkata
         run: |
+          echo "===== Python Version ====="
+          python --version
+
+          echo "===== Running jtvplus7.py ====="
           python script/jtvplus7.py
+
+          echo "===== Checking generated files ====="
+          ls -lah
+
+          echo "===== Checking zio.m3u ====="
+          if [ -f "zio.m3u" ]; then
+            echo "zio.m3u FOUND"
+            wc -l zio.m3u
+            ls -lh zio.m3u
+          else
+            echo "ERROR: zio.m3u was NOT generated!"
+            exit 1
+          fi
 
       - name: Commit and Push Changes
         run: |
@@ -58,26 +79,27 @@ jobs:
             exit 0
           fi
 
-          git commit -m "JIOTV Updated ✅ ($(date -u '+%Y-%m-%d %H:%M UTC'))"
+          git commit -m "JIOTV Updated"
 
-          max_retries=5
-          attempt=1
-
-          until [ $attempt -gt $max_retries ]
+          for attempt in 1 2 3 4 5
           do
             echo "Push attempt $attempt..."
-            git fetch origin main
-            git rebase origin/main
 
-            if git push origin main; then
-              echo "Push succeeded."
-              exit 0
+            git fetch origin main
+
+            if git rebase origin/main; then
+              if git push origin HEAD:main; then
+                echo "Push succeeded."
+                exit 0
+              fi
             else
-              echo "Push failed, retrying ($attempt/$max_retries)..."
-              attempt=$((attempt+1))
-              sleep $((RANDOM % 5 + 1))
+              echo "Rebase failed."
+              git rebase --abort || true
             fi
+
+            echo "Push failed. Waiting before retry..."
+            sleep $((attempt * 3))
           done
 
-          echo "Push failed"
+          echo "ERROR: Push failed after 5 attempts."
           exit 1
